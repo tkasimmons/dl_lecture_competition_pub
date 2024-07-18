@@ -8,11 +8,12 @@ from omegaconf import DictConfig
 import wandb
 from termcolor import cprint
 from tqdm import tqdm
-
+# 学習率スケジューラー
+from torch.optim import lr_scheduler
+import torch.optim as optim
 from src.datasets import ThingsMEGDataset
-from src.models import BasicConvClassifier
+from src.models import Resnet34
 from src.utils import set_seed
-
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def run(args: DictConfig):
@@ -39,14 +40,17 @@ def run(args: DictConfig):
     # ------------------
     #       Model
     # ------------------
-    model = BasicConvClassifier(
-        train_set.num_classes, train_set.seq_len, train_set.num_channels
-    ).to(args.device)
+    model = Resnet34().to(args.device)
+
 
     # ------------------
     #     Optimizer
     # ------------------
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+
+    #scheduler
+    cosine_annealing_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20, eta_min=0)
 
     # ------------------
     #   Start training
@@ -73,7 +77,8 @@ def run(args: DictConfig):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+            cosine_annealing_scheduler.step()
+
             acc = accuracy(y_pred, y)
             train_acc.append(acc.item())
 
